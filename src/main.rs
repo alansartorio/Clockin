@@ -112,6 +112,7 @@ fn lines(cancel: Receiver<()>) -> Receiver<Option<String>> {
             let line = line.unwrap();
             sender.send(Some(line)).unwrap();
         }
+        sender.send(None).unwrap();
     });
     thread::spawn(move || {
         cancel.recv().unwrap();
@@ -140,7 +141,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 .append(true)
                 .open(require_clockin_file()?)
                 .context("opening clockin file")?;
-            file.write_all(format!("-{}\n", now_string()).as_bytes())
+            file.write_all(format!("%-{}\n", now_string()).as_bytes())
                 .context("writing start time")?;
 
             let line_receiver = lines(cancel);
@@ -150,13 +151,12 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 file.write_all(b"\n")?;
             }
 
-            file.write_all(format!("+{}\n", now_string()).as_bytes())
+            file.write_all(format!("%+{}\n\n", now_string()).as_bytes())
                 .context("writing end time")?;
         }
         _ => unimplemented!("command"),
     };
 
-    println!("command: {command:?}");
     Ok(())
 }
 
