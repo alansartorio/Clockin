@@ -4,13 +4,16 @@ use std::{
     process,
     sync::mpsc::{self, Receiver},
     thread,
+    time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow};
+use summary::Summary;
 use writer::Writer;
 
 mod file;
 mod parser;
+mod summary;
 mod writer;
 
 #[derive(Debug)]
@@ -61,6 +64,14 @@ fn lines(cancel: Receiver<()>) -> Receiver<Option<String>> {
     receiver
 }
 
+fn fmt_duration(duration: &Duration) -> String {
+    let duration = duration.as_secs();
+    let hours = duration / (60 * 60);
+    let minutes = duration / 60 - hours * 60;
+    let seconds = duration - minutes * 60;
+    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+}
+
 fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
     match &command {
         Command::Link { name } => {
@@ -91,16 +102,18 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
         }
         Command::Summary => {
             let path = file::require_clockin_file()?;
-            for session in parser::parse_file(path).unwrap() {
-                let duration = session.duration().to_std().unwrap().as_secs();
-                let hours = duration / (60 * 60);
-                let minutes = duration / 60 - hours * 60;
-                let seconds = duration - minutes * 60;
-                let duration_str = format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
+            let sessions = parser::parse_file(path).unwrap();
+            let summary = Summary::summarize(sessions);
+            for (week, weekdata) in summary.weeks {
                 println!(
-                    "Start: {}, Duration: {}, Description: {}",
-                    session.start, duration_str, session.description
+                    "Week {}: {}",
+                    week.first_day(),
+                    fmt_duration(&weekdata.duration())
                 );
+
+                for (date, duration) in weekdata.days {
+                    println!("- {}: {}", date, fmt_duration(&duration));
+                }
             }
         }
         _ => unimplemented!("command"),
