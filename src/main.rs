@@ -12,8 +12,10 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use chrono::Local;
+use writer::Writer;
 
 mod parser;
+mod writer;
 
 #[derive(Debug)]
 enum Command {
@@ -98,11 +100,6 @@ fn require_clockin_file() -> Result<PathBuf> {
     find_clockin_file().ok_or(anyhow!(".clockin file not found"))
 }
 
-fn now_string() -> String {
-    let now = Local::now();
-    now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
-}
-
 fn lines(cancel: Receiver<()>) -> Receiver<Option<String>> {
     let (sender, receiver) = mpsc::channel();
     let sender2 = sender.clone();
@@ -137,31 +134,18 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             process.wait().context("error while editing file")?;
         }
         Command::ClockIn => {
-            let mut file = File::options()
-                .append(true)
-                .open(require_clockin_file()?)
-                .context("opening clockin file")?;
-            let mut print_and_write = move |s: &str, print: bool| {
-                if print {
-                    print!("{}", s);
-                }
-                file.write_all(s.as_bytes())
-            };
+            let mut writer = Writer::new(require_clockin_file()?)?;
             println!(
                 "{}",
                 concat!("==============\n", "= CLOCKED IN =\n", "==============")
             );
-            print_and_write(&format!("%-{}\n", now_string()), true)
-                .context("writing start time")?;
 
             let line_receiver = lines(cancel);
             while let Some(line) = line_receiver.recv().unwrap() {
-                print_and_write(&line, false).context("writing description")?;
-                print_and_write("\n", false)?;
+                writer.write_line(&line)?;
             }
 
-            print_and_write(&format!("%+{}\n\n", now_string()), true)
-                .context("writing end time")?;
+            writer.end()?;
         }
         Command::Summary => {
             let path = require_clockin_file()?;
