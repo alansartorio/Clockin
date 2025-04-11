@@ -31,13 +31,18 @@ impl PartialOrd for FixedWeek {
     }
 }
 
+pub struct Day {
+    pub duration: Duration,
+    pub descriptions: Vec<String>,
+}
+
 pub struct Week {
-    pub days: BTreeMap<NaiveDate, Duration>,
+    pub days: BTreeMap<NaiveDate, Day>,
 }
 
 impl Week {
     pub fn duration(&self) -> Duration {
-        self.days.values().sum()
+        self.days.values().map(|d| d.duration).sum()
     }
 }
 
@@ -84,12 +89,19 @@ impl Summary {
 
             let mut last_week = summary.weeks.last_entry().unwrap();
             if create_day {
-                last_week.get_mut().days.insert(date, Duration::ZERO);
+                last_week.get_mut().days.insert(
+                    date,
+                    Day {
+                        descriptions: vec![],
+                        duration: Duration::ZERO,
+                    },
+                );
             }
 
             let mut last_day = last_week.get_mut().days.last_entry().unwrap();
 
-            *last_day.get_mut() += duration;
+            last_day.get_mut().duration += duration;
+            last_day.get_mut().descriptions.push(session.description);
         }
         summary
     }

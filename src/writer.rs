@@ -5,7 +5,7 @@ use chrono::{DateTime, Local, TimeZone};
 
 pub struct Writer {
     file: File,
-    start: DateTime<Local>,
+    pub start: DateTime<Local>,
     closed: bool,
 }
 

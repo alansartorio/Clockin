@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
+use chrono::{DateTime, Datelike, TimeZone};
 use summary::Summary;
 use writer::Writer;
 
@@ -21,6 +22,7 @@ enum Command {
     Link { name: String },
     ClockIn,
     Summary,
+    Binnacle,
     Edit,
 }
 
@@ -42,6 +44,7 @@ fn parse_args(args: Args) -> Result<Command> {
         "in" => Ok(Command::ClockIn),
         "summary" => Ok(Command::Summary),
         "edit" => Ok(Command::Edit),
+        "binnacle" | "bitacora" => Ok(Command::Binnacle),
         command => Err(anyhow!("invalid command {command}")),
     }
 }
@@ -72,6 +75,10 @@ fn fmt_duration(duration: &Duration) -> String {
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
 
+fn fmt_datetime<Tz: TimeZone>(dt: &DateTime<Tz>) -> String {
+    dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+}
+
 fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
     match &command {
         Command::Link { name } => {
@@ -92,13 +99,15 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 "{}",
                 concat!("==============\n", "= CLOCKED IN =\n", "==============")
             );
+            println!("{}", fmt_datetime(&writer.start));
 
             let line_receiver = lines(cancel);
             while let Some(line) = line_receiver.recv().unwrap() {
                 writer.write_line(&line)?;
             }
 
-            writer.end()?;
+            let end = writer.end()?;
+            println!("{}", fmt_datetime(&end));
         }
         Command::Summary => {
             let path = file::require_clockin_file()?;
@@ -111,12 +120,39 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                     fmt_duration(&weekdata.duration())
                 );
 
-                for (date, duration) in weekdata.days {
-                    println!("- {}: {}", date, fmt_duration(&duration));
+                for (date, day) in weekdata.days {
+                    println!("- {}: {}", date, fmt_duration(&day.duration));
                 }
             }
         }
-        _ => unimplemented!("command"),
+        Command::Binnacle => {
+            let path = file::require_clockin_file()?;
+            let sessions = parser::parse_file(path).unwrap();
+            let summary = Summary::summarize(sessions);
+
+            let mut last_month = None;
+            for (week, weekdata) in summary.weeks {
+                let year = week.first_day().year_ce().1;
+                let month = week.first_day().month();
+
+                if last_month.is_none_or(|last_month| last_month != (year, month)) {
+                    last_month = Some((year, month));
+                    println!("## Month {}-{:02}\n", year, month);
+                }
+                println!(
+                    "### Week {}: {}\n",
+                    week.first_day().day0() / 7 + 1,
+                    fmt_duration(&weekdata.duration())
+                );
+
+                for (date, day) in weekdata.days {
+                    println!("- {} - ({})\n", date, fmt_duration(&day.duration));
+                    for description in day.descriptions {
+                        println!("\t- {}\n", description);
+                    }
+                }
+            }
+        }
     };
 
     Ok(())
