@@ -1,9 +1,9 @@
 use std::{
     env::{Args, args, current_dir},
     fs::{self, File},
-    io::{Write, stdin},
+    io::{BufRead, BufReader, Write, stdin},
     os,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process,
     str::FromStr,
     sync::mpsc::{self, Receiver},
@@ -11,7 +11,9 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use chrono::Local;
+use chrono::{DateTime, Duration, Local};
+
+mod parser;
 
 #[derive(Debug)]
 enum Command {
@@ -160,6 +162,17 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
 
             print_and_write(&format!("%+{}\n\n", now_string()), true)
                 .context("writing end time")?;
+        }
+        Command::Summary => {
+            let path = require_clockin_file()?;
+            for session in parser::parse_file(path).unwrap() {
+                let duration = session.duration().to_std().unwrap().as_secs();
+                let hours = duration / (60 * 60);
+                let minutes = duration / 60 - hours * 60;
+                let seconds = duration - minutes * 60;
+                let duration_str = format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
+                println!("Start: {}, Duration: {}, Description: {}", session.start, duration_str, session.description);
+            }
         }
         _ => unimplemented!("command"),
     };
