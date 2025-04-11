@@ -17,7 +17,6 @@ use chrono::Local;
 enum Command {
     Link { name: String },
     ClockIn,
-    ClockOut,
     Summary,
     Edit,
 }
@@ -38,7 +37,6 @@ fn parse_args(args: Args) -> Result<Command> {
                 .to_owned(),
         }),
         "in" => Ok(Command::ClockIn),
-        "out" => Ok(Command::ClockOut),
         "summary" => Ok(Command::Summary),
         "edit" => Ok(Command::Edit),
         command => Err(anyhow!("invalid command {command}")),
@@ -141,17 +139,26 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 .append(true)
                 .open(require_clockin_file()?)
                 .context("opening clockin file")?;
-            file.write_all(format!("%-{}\n", now_string()).as_bytes())
+            let mut print_and_write = move |s: &str, print: bool| {
+                if print {
+                    print!("{}", s);
+                }
+                file.write_all(s.as_bytes())
+            };
+            println!(
+                "{}",
+                concat!("==============\n", "= CLOCKED IN =\n", "==============")
+            );
+            print_and_write(&format!("%-{}\n", now_string()), true)
                 .context("writing start time")?;
 
             let line_receiver = lines(cancel);
             while let Some(line) = line_receiver.recv().unwrap() {
-                file.write_all(line.as_bytes())
-                    .context("writing description")?;
-                file.write_all(b"\n")?;
+                print_and_write(&line, false).context("writing description")?;
+                print_and_write("\n", false)?;
             }
 
-            file.write_all(format!("%+{}\n\n", now_string()).as_bytes())
+            print_and_write(&format!("%+{}\n\n", now_string()), true)
                 .context("writing end time")?;
         }
         _ => unimplemented!("command"),
