@@ -1,9 +1,9 @@
 use std::{
     env::{Args, args, current_dir},
     fs::{self, File},
-    io::{BufRead, BufReader, Write, stdin},
+    io::{Write, stdin},
     os,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process,
     str::FromStr,
     sync::mpsc::{self, Receiver},
@@ -11,7 +11,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, Duration, Local};
+use chrono::Local;
 
 mod parser;
 
@@ -171,7 +171,10 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 let minutes = duration / 60 - hours * 60;
                 let seconds = duration - minutes * 60;
                 let duration_str = format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
-                println!("Start: {}, Duration: {}, Description: {}", session.start, duration_str, session.description);
+                println!(
+                    "Start: {}, Duration: {}, Description: {}",
+                    session.start, duration_str, session.description
+                );
             }
         }
         _ => unimplemented!("command"),
