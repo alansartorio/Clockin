@@ -59,7 +59,7 @@ pub trait NaiveDateExt {
 impl NaiveDateExt for NaiveDate {
     fn month_id(&self) -> MonthId {
         let year = self.year_ce().1;
-        let month = self.month() as u8;
+        let month = self.month0() as u8;
         MonthId::new(year, month)
     }
 
