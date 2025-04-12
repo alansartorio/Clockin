@@ -8,8 +8,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, Datelike, TimeZone};
-use summary::Summary;
+use chrono::{DateTime, TimeZone};
+use summary::{NaiveDateExt, Summary};
 use writer::Writer;
 
 mod file;
@@ -113,16 +113,21 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
             let summary = Summary::summarize(sessions);
-            for (week, weekdata) in summary.weeks {
-                println!(
-                    "Week {}: {}",
-                    week.first_day(),
-                    fmt_duration(&weekdata.duration())
-                );
 
-                for (date, day) in weekdata.days {
-                    println!("- {}: {}", date, fmt_duration(&day.duration));
+            let mut last_week = None;
+            for (date, day) in &summary.days {
+                let week = date.real_week();
+
+                if last_week.is_none_or(|last_week| last_week != week) {
+                    last_week = Some(week);
+                    println!(
+                        "Week {}: {}",
+                        week.first_day(),
+                        fmt_duration(&summary.week_duration(week))
+                    );
                 }
+
+                println!("- {}: {}", date, fmt_duration(&day.duration));
             }
         }
         Command::Binnacle => {
@@ -131,25 +136,28 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             let summary = Summary::summarize(sessions);
 
             let mut last_month = None;
-            for (week, weekdata) in summary.weeks {
-                let year = week.first_day().year_ce().1;
-                let month = week.first_day().month();
+            let mut last_week = None;
+            for (date, day) in &summary.days {
+                let week = date.real_week();
+                let month = date.month_id();
 
-                if last_month.is_none_or(|last_month| last_month != (year, month)) {
-                    last_month = Some((year, month));
-                    println!("## Month {}-{:02}\n", year, month);
+                if last_month.is_none_or(|last_month| last_month != month) {
+                    last_month = Some(month);
+                    println!("## Month {}-{:02}\n", month.year, month.month);
                 }
-                println!(
-                    "### Week {}: {}\n",
-                    week.first_day().day0() / 7 + 1,
-                    fmt_duration(&weekdata.duration())
-                );
 
-                for (date, day) in weekdata.days {
-                    println!("- {} - ({})\n", date, fmt_duration(&day.duration));
-                    for description in day.descriptions {
-                        println!("\t- {}\n", description);
-                    }
+                if last_week.is_none_or(|last_week| last_week != week) {
+                    last_week = Some(week);
+                    println!(
+                        "### Week {}: {}\n",
+                        week.first_day(),
+                        fmt_duration(&summary.week_duration(week))
+                    );
+                }
+
+                println!("- {} - ({})\n", date, fmt_duration(&day.duration));
+                for description in &day.descriptions {
+                    println!("\t- {}\n", description);
                 }
             }
         }

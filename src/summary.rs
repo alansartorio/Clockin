@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, collections::BTreeMap, time::Duration};
+use std::{cmp::Ordering, collections::BTreeMap, ops::RangeInclusive, time::Duration};
 
-use chrono::{NaiveDate, NaiveWeek};
+use chrono::{Datelike, NaiveDate, NaiveWeek};
 
 use crate::parser::Session;
 
@@ -31,77 +31,77 @@ impl PartialOrd for FixedWeek {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub struct MonthId {
+    pub year: u32,
+    pub month: u8,
+}
+
+pub trait NaiveDateExt {
+    fn month_id(&self) -> MonthId;
+    fn real_week(&self) -> FixedWeek;
+}
+
+impl NaiveDateExt for NaiveDate {
+    fn month_id(&self) -> MonthId {
+        let year = self.year_ce().1;
+        let month = self.month() as u8;
+        MonthId { year, month }
+    }
+
+    fn real_week(&self) -> FixedWeek {
+        FixedWeek(self.week(chrono::Weekday::Mon))
+    }
+}
+
 pub struct Day {
     pub duration: Duration,
     pub descriptions: Vec<String>,
 }
 
-pub struct Week {
+pub struct Summary {
     pub days: BTreeMap<NaiveDate, Day>,
 }
 
-impl Week {
-    pub fn duration(&self) -> Duration {
-        self.days.values().map(|d| d.duration).sum()
+impl Summary {
+    pub fn duration(&self, range: RangeInclusive<NaiveDate>) -> Duration {
+        self.days
+            .range(range)
+            .map(|(_date, day)| day.duration)
+            .sum()
     }
-}
-
-pub struct Summary {
-    pub weeks: BTreeMap<FixedWeek, Week>,
+    pub fn week_duration(&self, week: FixedWeek) -> Duration {
+        self.duration(week.0.first_day()..=week.0.last_day())
+    }
 }
 
 impl Summary {
     pub fn summarize(sessions: impl Iterator<Item = Session>) -> Self {
         let mut summary = Summary {
-            weeks: Default::default(),
+            days: Default::default(),
         };
 
         for session in sessions {
             let date = session.start.date_naive();
-            let week = FixedWeek(date.week(chrono::Weekday::Mon));
             let duration = session.duration().to_std().unwrap();
-            let last_week = summary.weeks.last_entry();
-
-            let create_week = last_week
-                .as_ref()
-                .is_none_or(|last_week| last_week.key() != &week);
-            let last_day = (!create_week)
-                .then(move || {
-                    last_week
-                        .unwrap()
-                        .get()
-                        .days
-                        .last_key_value()
-                        .map(|(date, _duration)| *date)
-                })
-                .flatten();
-
-            let create_day = last_day.is_none_or(|last_day| last_day != date);
-
-            if create_week {
-                summary.weeks.insert(
-                    week,
-                    Week {
-                        days: Default::default(),
-                    },
-                );
-            }
-
-            let mut last_week = summary.weeks.last_entry().unwrap();
-            if create_day {
-                last_week.get_mut().days.insert(
+            if summary
+                .days
+                .last_entry()
+                .is_none_or(|last_date| last_date.key() != &date)
+            {
+                summary.days.insert(
                     date,
                     Day {
-                        descriptions: vec![],
                         duration: Duration::ZERO,
+                        descriptions: vec![],
                     },
                 );
             }
 
-            let mut last_day = last_week.get_mut().days.last_entry().unwrap();
-
-            last_day.get_mut().duration += duration;
-            last_day.get_mut().descriptions.push(session.description);
+            let mut last_entry = summary.days.last_entry().unwrap();
+            let last_entry = last_entry.get_mut();
+            last_entry.duration += duration;
+            last_entry.descriptions.push(session.description);
         }
         summary
     }
