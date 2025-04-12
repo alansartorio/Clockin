@@ -27,6 +27,11 @@ enum Command {
     Binnacle,
     Edit,
     Cd,
+    Exec { command: String },
+}
+
+fn get_shell() -> String {
+    std::env::var("SHELL").unwrap_or("sh".to_owned())
 }
 
 fn parse_args(args: Args) -> Result<Command> {
@@ -49,6 +54,12 @@ fn parse_args(args: Args) -> Result<Command> {
         "edit" => Ok(Command::Edit),
         "binnacle" | "bitacora" => Ok(Command::Binnacle),
         "cd" => Ok(Command::Cd),
+        "exec" => Ok(Command::Exec {
+            command: args
+                .get(1)
+                .ok_or(anyhow!("missing \"command\" argument"))?
+                .to_owned(),
+        }),
         command => Err(anyhow!("invalid command {command}")),
     }
 }
@@ -191,8 +202,14 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             }
         }
         Command::Cd => {
-            let shell = std::env::var("SHELL").unwrap_or("sh".to_owned());
-            Err(process::Command::new(&shell)
+            Err(process::Command::new(get_shell())
+                .current_dir(get_data_dir())
+                .exec())?;
+        }
+        Command::Exec { command } => {
+            Err(process::Command::new("sh")
+                .arg("-c")
+                .arg(command)
                 .current_dir(get_data_dir())
                 .exec())?;
         }
