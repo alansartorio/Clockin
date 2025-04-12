@@ -1,6 +1,7 @@
 use std::{
     env::{Args, args},
     io::stdin,
+    os::unix::process::CommandExt,
     process,
     sync::mpsc::{self, Receiver},
     thread,
@@ -9,6 +10,7 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Datelike, TimeZone, Weekday};
+use file::get_data_dir;
 use summary::{MonthId, NaiveDateExt, Summary};
 use writer::Writer;
 
@@ -24,6 +26,7 @@ enum Command {
     Summary,
     Binnacle,
     Edit,
+    Cd,
 }
 
 fn parse_args(args: Args) -> Result<Command> {
@@ -45,6 +48,7 @@ fn parse_args(args: Args) -> Result<Command> {
         "summary" => Ok(Command::Summary),
         "edit" => Ok(Command::Edit),
         "binnacle" | "bitacora" => Ok(Command::Binnacle),
+        "cd" => Ok(Command::Cd),
         command => Err(anyhow!("invalid command {command}")),
     }
 }
@@ -185,6 +189,12 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                     println!("\t- {}\n", description);
                 }
             }
+        }
+        Command::Cd => {
+            let shell = std::env::var("SHELL").unwrap_or("sh".to_owned());
+            Err(process::Command::new(&shell)
+                .current_dir(get_data_dir())
+                .exec())?;
         }
     };
 

@@ -48,7 +48,7 @@ fn get_var_path(name: &str) -> Option<PathBuf> {
         .ok()
 }
 
-fn get_data_dir() -> PathBuf {
+pub fn get_data_dir() -> PathBuf {
     let mut data = get_var_path("XDG_DATA_HOME")
         .or_else(|| {
             get_var_path("HOME").map(|mut home| {
