@@ -18,5 +18,6 @@ RUN cargo build --release --bin clockin
 
 # We do not need the Rust toolchain to run the binary!
 FROM gcr.io/distroless/cc-debian12
+COPY --from=busybox:1.35.0-uclibc /bin/sh /bin/sh
 COPY --from=builder /app/target/release/clockin /
 ENTRYPOINT ["./clockin"]
