@@ -26,7 +26,7 @@ pub struct SessionIterator {
 }
 
 fn is_macro_line(line: impl AsRef<str>, prefix: char) -> bool {
-    line.as_ref().chars().nth(0) == Some('%') && line.as_ref().chars().nth(1) == Some(prefix)
+    line.as_ref().starts_with(['%', prefix])
 }
 
 fn extract_macro(line: &str, prefix: char) -> Option<DateTime<FixedOffset>> {

@@ -49,7 +49,7 @@ fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Co
             "--from" | "-f" => {
                 from = Bound::Included(
                     NaiveDate::parse_from_str(
-                        &args
+                        args
                             .next()
                             .ok_or_else(|| anyhow!("expected argument value after \"--from\""))?,
                         "%Y-%m-%d",
@@ -60,7 +60,7 @@ fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Co
             "--to" | "-t" => {
                 to = Bound::Included(
                     NaiveDate::parse_from_str(
-                        &args
+                        args
                             .next()
                             .ok_or_else(|| anyhow!("expected argument value after \"--to\""))?,
                         "%Y-%m-%d",
