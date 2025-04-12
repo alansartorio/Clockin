@@ -1,8 +1,32 @@
-use std::{env::current_dir, fs::{self, File}, os, path::PathBuf, str::FromStr};
+use std::{
+    env::current_dir,
+    fs::{self, File},
+    os,
+    path::PathBuf,
+    str::FromStr,
+};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 fn find_clockin_file() -> Option<PathBuf> {
+    let project = std::env::var("CLOCKIN_PROJECT")
+        .ok()
+        .map(|project_name| {
+            let mut path = get_data_dir();
+            path.push(project_name);
+            path
+        })
+        .map(|path| {
+            path.exists()
+                .then_some(path)
+                .ok_or(anyhow!("the specified CLOCKIN_PROJECT does not exist"))
+        })
+        .transpose()
+        .unwrap();
+    if project.is_some() {
+        return project;
+    }
+
     let first_dir = current_dir().unwrap();
     let mut maybe_dir = Some(first_dir.as_path());
 
