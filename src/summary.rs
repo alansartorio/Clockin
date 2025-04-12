@@ -115,7 +115,9 @@ impl Summary {
             let mut last_entry = summary.days.last_entry().unwrap();
             let last_entry = last_entry.get_mut();
             last_entry.duration += duration;
-            last_entry.descriptions.push(session.description);
+            if !session.description.is_empty() {
+                last_entry.descriptions.push(session.description);
+            }
         }
         summary
     }
