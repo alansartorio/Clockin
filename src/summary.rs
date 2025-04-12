@@ -33,8 +33,22 @@ impl PartialOrd for FixedWeek {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct MonthId {
-    pub year: u32,
-    pub month: u8,
+    year: u32,
+    month: u8,
+}
+
+impl MonthId {
+    pub fn new(year: u32, month: u8) -> Self {
+        assert!(month < 12);
+        Self { year, month }
+    }
+
+    pub fn year(&self) -> u32 {
+        self.year
+    }
+    pub fn month(&self) -> u8 {
+        self.month
+    }
 }
 
 pub trait NaiveDateExt {
@@ -46,7 +60,7 @@ impl NaiveDateExt for NaiveDate {
     fn month_id(&self) -> MonthId {
         let year = self.year_ce().1;
         let month = self.month() as u8;
-        MonthId { year, month }
+        MonthId::new(year, month)
     }
 
     fn real_week(&self) -> FixedWeek {

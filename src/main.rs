@@ -8,8 +8,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, TimeZone};
-use summary::{NaiveDateExt, Summary};
+use chrono::{DateTime, Datelike, TimeZone, Weekday};
+use summary::{MonthId, NaiveDateExt, Summary};
 use writer::Writer;
 
 mod file;
@@ -79,6 +79,36 @@ fn fmt_datetime<Tz: TimeZone>(dt: &DateTime<Tz>) -> String {
     dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
 }
 
+fn fmt_month(month: MonthId) -> String {
+    let month_name = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Septiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+    ][month.month() as usize];
+    format!("{} {}", month_name, month.year())
+}
+
+fn fmt_weekday(day: Weekday) -> &'static str {
+    match day {
+        Weekday::Mon => "Lunes",
+        Weekday::Tue => "Martes",
+        Weekday::Wed => "Miercoles",
+        Weekday::Thu => "Jueves",
+        Weekday::Fri => "Viernes",
+        Weekday::Sat => "Sabado",
+        Weekday::Sun => "Domingo",
+    }
+}
+
 fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
     match &command {
         Command::Link { name } => {
@@ -136,26 +166,21 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             let summary = Summary::summarize(sessions);
 
             let mut last_month = None;
-            let mut last_week = None;
             for (date, day) in &summary.days {
-                let week = date.real_week();
                 let month = date.month_id();
 
                 if last_month.is_none_or(|last_month| last_month != month) {
                     last_month = Some(month);
-                    println!("## Month {}-{:02}\n", month.year, month.month);
+                    println!("## {}\n", fmt_month(month));
                 }
 
-                if last_week.is_none_or(|last_week| last_week != week) {
-                    last_week = Some(week);
-                    println!(
-                        "### Week {}: {}\n",
-                        week.first_day(),
-                        fmt_duration(&summary.week_duration(week))
-                    );
-                }
-
-                println!("- {} - ({})\n", date, fmt_duration(&day.duration));
+                println!(
+                    "- {} {:02}/{:02} ({})\n",
+                    fmt_weekday(date.weekday()),
+                    date.day0() + 1,
+                    date.month0() + 1,
+                    fmt_duration(&day.duration)
+                );
                 for description in &day.descriptions {
                     println!("\t- {}\n", description);
                 }
