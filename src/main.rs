@@ -49,8 +49,7 @@ fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Co
             "--from" | "-f" => {
                 from = Bound::Included(
                     NaiveDate::parse_from_str(
-                        args
-                            .next()
+                        args.next()
                             .ok_or_else(|| anyhow!("expected argument value after \"--from\""))?,
                         "%Y-%m-%d",
                     )
@@ -60,8 +59,7 @@ fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Co
             "--to" | "-t" => {
                 to = Bound::Included(
                     NaiveDate::parse_from_str(
-                        args
-                            .next()
+                        args.next()
                             .ok_or_else(|| anyhow!("expected argument value after \"--to\""))?,
                         "%Y-%m-%d",
                     )
@@ -227,7 +225,11 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
 
                 if last_month.is_none_or(|last_month| last_month != month) {
                     last_month = Some(month);
-                    println!("## {}\n", fmt_month(month));
+                    println!(
+                        "## {} ({})\n",
+                        fmt_month(month),
+                        fmt_duration(&summary.duration(month.first_day()..=month.last_day()))
+                    );
                 }
 
                 println!(

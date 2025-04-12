@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::BTreeMap, ops::RangeBounds, time::Duration};
 
-use chrono::{Datelike, NaiveDate, NaiveWeek};
+use chrono::{Datelike, Days, Months, NaiveDate, NaiveWeek};
 
 use crate::parser::Session;
 
@@ -48,6 +48,17 @@ impl MonthId {
     }
     pub fn month(&self) -> u8 {
         self.month
+    }
+
+    pub fn first_day(&self) -> NaiveDate {
+        NaiveDate::from_ymd_opt(self.year as i32, self.month as u32 + 1, 1).unwrap()
+    }
+    pub fn last_day(&self) -> NaiveDate {
+        self.first_day()
+            .checked_add_months(Months::new(1))
+            .unwrap()
+            .checked_sub_days(Days::new(1))
+            .unwrap()
     }
 }
 
