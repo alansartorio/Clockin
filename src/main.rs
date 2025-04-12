@@ -125,8 +125,9 @@ fn lines(cancel: Receiver<()>) -> Receiver<Option<String>> {
 fn fmt_duration(duration: &Duration) -> String {
     let duration = duration.as_secs();
     let hours = duration / (60 * 60);
-    let minutes = duration / 60 - hours * 60;
-    let seconds = duration - minutes * 60;
+    let total_minutes = duration / 60;
+    let minutes = total_minutes - hours * 60;
+    let seconds = duration - total_minutes * 60;
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
 
