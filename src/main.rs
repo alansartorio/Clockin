@@ -1,6 +1,7 @@
 use std::{
     env::{Args, args},
     io::stdin,
+    ops::Bound,
     os::unix::process::CommandExt,
     process,
     sync::mpsc::{self, Receiver},
@@ -9,7 +10,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, Datelike, TimeZone, Weekday};
+use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Weekday};
 use file::get_data_dir;
 use summary::{MonthId, NaiveDateExt, Summary};
 use writer::Writer;
@@ -21,17 +22,56 @@ mod writer;
 
 #[derive(Debug)]
 enum Command {
-    Link { name: String },
+    Link {
+        name: String,
+    },
     ClockIn,
     Summary,
-    Binnacle,
+    Binnacle {
+        range: (Bound<NaiveDate>, Bound<NaiveDate>),
+    },
     Edit,
     Cd,
-    Exec { command: String },
+    Exec {
+        command: String,
+    },
 }
 
 fn get_shell() -> String {
     std::env::var("SHELL").unwrap_or("sh".to_owned())
+}
+
+fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Command> {
+    let mut from = Bound::Unbounded;
+    let mut to = Bound::Unbounded;
+    while let Some(arg) = args.next() {
+        match arg {
+            "--from" | "-f" => {
+                from = Bound::Included(
+                    NaiveDate::parse_from_str(
+                        &args
+                            .next()
+                            .ok_or_else(|| anyhow!("expected argument value after \"--from\""))?,
+                        "%Y-%m-%d",
+                    )
+                    .context("could not parse \"--from\" date")?,
+                )
+            }
+            "--to" | "-t" => {
+                to = Bound::Included(
+                    NaiveDate::parse_from_str(
+                        &args
+                            .next()
+                            .ok_or_else(|| anyhow!("expected argument value after \"--to\""))?,
+                        "%Y-%m-%d",
+                    )
+                    .context("could not parse \"--to\" date")?,
+                )
+            }
+            arg => Err(anyhow!("unrecognized argument \"{arg}\""))?,
+        }
+    }
+    Ok(Command::Binnacle { range: (from, to) })
 }
 
 fn parse_args(args: Args) -> Result<Command> {
@@ -52,7 +92,7 @@ fn parse_args(args: Args) -> Result<Command> {
         "in" => Ok(Command::ClockIn),
         "summary" => Ok(Command::Summary),
         "edit" => Ok(Command::Edit),
-        "binnacle" | "bitacora" => Ok(Command::Binnacle),
+        "binnacle" | "bitacora" => parse_binnacle_args(args.iter().map(String::as_str).skip(1)),
         "cd" => Ok(Command::Cd),
         "exec" => Ok(Command::Exec {
             command: args
@@ -125,9 +165,9 @@ fn fmt_weekday(day: Weekday) -> &'static str {
 }
 
 fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
-    match &command {
+    match command {
         Command::Link { name } => {
-            file::create_clockin_file(name)?;
+            file::create_clockin_file(&name)?;
         }
         Command::Edit => {
             let path = file::require_clockin_file()?;
@@ -175,13 +215,13 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 println!("- {}: {}", date, fmt_duration(&day.duration));
             }
         }
-        Command::Binnacle => {
+        Command::Binnacle { range } => {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
             let summary = Summary::summarize(sessions);
 
             let mut last_month = None;
-            for (date, day) in &summary.days {
+            for (date, day) in summary.days.range(range) {
                 let month = date.month_id();
 
                 if last_month.is_none_or(|last_month| last_month != month) {

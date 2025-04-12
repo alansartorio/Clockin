@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::BTreeMap, ops::RangeInclusive, time::Duration};
+use std::{cmp::Ordering, collections::BTreeMap, ops::RangeBounds, time::Duration};
 
 use chrono::{Datelike, NaiveDate, NaiveWeek};
 
@@ -78,7 +78,7 @@ pub struct Summary {
 }
 
 impl Summary {
-    pub fn duration(&self, range: RangeInclusive<NaiveDate>) -> Duration {
+    pub fn duration(&self, range: impl RangeBounds<NaiveDate>) -> Duration {
         self.days
             .range(range)
             .map(|(_date, day)| day.duration)
