@@ -141,6 +141,15 @@ fn fmt_duration(duration: &Duration) -> String {
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
 
+fn fmt_duration_uncertain(duration: &Duration, completed: bool) -> String {
+    let mut out = fmt_duration(duration);
+    if !completed {
+        out.push_str(" (incompleto)");
+    }
+
+    out
+}
+
 fn fmt_datetime<Tz: TimeZone>(dt: &DateTime<Tz>) -> String {
     dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
 }
@@ -230,6 +239,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
             let summary = Summary::summarize(sessions, &timezone);
+            let current_date = Local::now().with_timezone(&timezone).date_naive();
 
             let mut last_month = None;
             for (date, day) in summary.days.range(range) {
@@ -240,7 +250,10 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                     println!(
                         "## {} ({})\n",
                         fmt_month(month),
-                        fmt_duration(&summary.duration(month.first_day()..=month.last_day()))
+                        fmt_duration_uncertain(
+                            &summary.duration(month.first_day()..=month.last_day()),
+                            current_date > month.last_day()
+                        )
                     );
                 }
 
@@ -249,7 +262,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                     fmt_weekday(date.weekday()),
                     date.day0() + 1,
                     date.month0() + 1,
-                    fmt_duration(&day.duration)
+                    fmt_duration_uncertain(&day.duration, &current_date > date)
                 );
                 for description in &day.descriptions {
                     println!("\t- {}\n", description);
