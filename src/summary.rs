@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::BTreeMap, ops::RangeBounds, time::Duration};
 
-use chrono::{Datelike, Days, Months, NaiveDate, NaiveWeek};
+use chrono::{Datelike, Days, Months, NaiveDate, NaiveWeek, TimeZone};
 
 use crate::parser::Session;
 
@@ -101,13 +101,13 @@ impl Summary {
 }
 
 impl Summary {
-    pub fn summarize(sessions: impl Iterator<Item = Session>) -> Self {
+    pub fn summarize<Tz: TimeZone>(sessions: impl Iterator<Item = Session>, timezone: &Tz) -> Self {
         let mut summary = Summary {
             days: Default::default(),
         };
 
         for session in sessions {
-            let date = session.start.date_naive();
+            let date = session.start.with_timezone(timezone).date_naive();
             let duration = session.duration().to_std().unwrap();
             if summary
                 .days

@@ -10,7 +10,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Weekday};
+use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate, TimeZone, Weekday};
 use file::get_data_dir;
 use summary::{MonthId, NaiveDateExt, Summary};
 use writer::Writer;
@@ -29,6 +29,7 @@ enum Command {
     Summary,
     Binnacle {
         range: (Bound<NaiveDate>, Bound<NaiveDate>),
+        timezone: FixedOffset,
     },
     Edit,
     Cd,
@@ -44,6 +45,7 @@ fn get_shell() -> String {
 fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Command> {
     let mut from = Bound::Unbounded;
     let mut to = Bound::Unbounded;
+    let mut timezone = None;
     while let Some(arg) = args.next() {
         match arg {
             "--from" | "-f" => {
@@ -66,10 +68,20 @@ fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Co
                     .context("could not parse \"--to\" date")?,
                 )
             }
+            "--timezone" | "-tz" => {
+                timezone = Some(
+                    args.next()
+                        .ok_or_else(|| anyhow!("expected argument value after \"--timezone\""))?
+                        .parse::<FixedOffset>()?,
+                )
+            }
             arg => Err(anyhow!("unrecognized argument \"{arg}\""))?,
         }
     }
-    Ok(Command::Binnacle { range: (from, to) })
+    Ok(Command::Binnacle {
+        range: (from, to),
+        timezone: timezone.unwrap_or_else(|| Local::now().fixed_offset().timezone()),
+    })
 }
 
 fn parse_args(args: Args) -> Result<Command> {
@@ -196,7 +208,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
         Command::Summary => {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
-            let summary = Summary::summarize(sessions);
+            let summary = Summary::summarize(sessions, &Local);
 
             let mut last_week = None;
             for (date, day) in &summary.days {
@@ -214,10 +226,10 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 println!("- {}: {}", date, fmt_duration(&day.duration));
             }
         }
-        Command::Binnacle { range } => {
+        Command::Binnacle { range, timezone } => {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
-            let summary = Summary::summarize(sessions);
+            let summary = Summary::summarize(sessions, &timezone);
 
             let mut last_month = None;
             for (date, day) in summary.days.range(range) {
