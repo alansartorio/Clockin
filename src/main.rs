@@ -126,7 +126,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             let end = writer.end()?;
             println!("{}", fmt_datetime(&end));
         }
-        Command::Summary => {
+        Command::WeekSummary => {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
             let summary = Summary::summarize(sessions, &Local);
@@ -147,7 +147,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 println!("- {}: {}", date, fmt_duration(&day.duration));
             }
         }
-        Command::Binnacle { from, to, timezone } => {
+        Command::Summary { from, to, timezone } => {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
             let summary = Summary::summarize(sessions, &timezone);

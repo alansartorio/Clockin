@@ -26,13 +26,15 @@ pub struct Args {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    #[command(about = "create a project and link the current directory to it")]
     Link {
         name: String,
     },
+    #[command(about = "start a time tracking session")]
     In,
-    Summary,
-    #[command(alias = "bitacora")]
-    Binnacle {
+    WeekSummary,
+    #[command(alias = "bitacora", about = "print a report of time spent on the project broken down by month and by day")]
+    Summary {
         #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
         from: Bound<NaiveDate>,
         #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
@@ -40,8 +42,11 @@ pub enum Command {
         #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
         timezone: FixedOffset,
     },
+    #[command(about = "open the project times file in the editor")]
     Edit,
+    #[command(about = "open a subshell inside the clockin data directory, respects SHELL environment variable")]
     Cd,
+    #[command(about = "execute a command inside the clockin data directory, useful for syncing/git commands, respects EDITOR environment variable")]
     Exec {
         command: String,
     },
