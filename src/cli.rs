@@ -21,7 +21,7 @@ fn parse_bound_naive_date(s: &str) -> Result<Bound<NaiveDate>, String> {
 #[command(about = "Time tracking utility", long_about = None)]
 pub struct Args {
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
 }
 
 #[derive(Debug, Subcommand)]

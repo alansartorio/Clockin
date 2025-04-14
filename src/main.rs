@@ -200,7 +200,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
 
 fn main() -> Result<()> {
     let args = cli::Args::parse();
-    let command = args.command;
+    let command = args.command.unwrap_or(Command::In);
 
     let (canceller, cancel) = mpsc::channel();
     ctrlc::set_handler(move || {
