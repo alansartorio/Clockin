@@ -89,7 +89,7 @@ fn parse_args(args: Args) -> Result<Command> {
 
     match args
         .first()
-        .expect("missing command")
+        .ok_or_else(|| anyhow!("missing command"))?
         .to_lowercase()
         .as_str()
     {
@@ -107,10 +107,10 @@ fn parse_args(args: Args) -> Result<Command> {
         "exec" => Ok(Command::Exec {
             command: args
                 .get(1)
-                .ok_or(anyhow!("missing \"command\" argument"))?
+                .ok_or(anyhow!("missing \"shell-command\" argument"))?
                 .to_owned(),
         }),
-        command => Err(anyhow!("invalid command {command}")),
+        command => Err(anyhow!("invalid command \"{command}\"")),
     }
 }
 fn lines(cancel: Receiver<()>) -> Receiver<Option<String>> {
@@ -286,8 +286,20 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
     Ok(())
 }
 
-fn main() {
-    let command = parse_args(args()).expect("error while parsing arguments");
+fn main() -> Result<()> {
+    let command = parse_args(args()).context("error while parsing arguments, usage:
+clockin <command>
+
+commands:
+  - link
+  - in
+  - (binnacle|bitacora) [(--from|-f) <from-date>] [(--to|-t) <to-date>] [(--timezone|-tz) <timezone>]
+      dates in yyyy-mm-dd format
+      timezone in [+-]HH:MM format
+  - edit
+  - cd
+  - exec <shell-command>
+      shell-command is a single argument passed to shell")?;
 
     let (canceller, cancel) = mpsc::channel();
     ctrlc::set_handler(move || {
@@ -296,5 +308,6 @@ fn main() {
             .expect("could not send signal on channel.")
     })
     .expect("error setting Ctrl-C handler");
-    run(command, cancel).expect("error while running command");
+    run(command, cancel).context("error while running command")?;
+    Ok(())
 }
