@@ -1,7 +1,5 @@
 use std::{
-    env::{Args, args},
     io::stdin,
-    ops::Bound,
     os::unix::process::CommandExt,
     process,
     sync::mpsc::{self, Receiver},
@@ -9,110 +7,24 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDate, TimeZone, Weekday};
+use anyhow::{Context, Result};
+use chrono::{DateTime, Datelike, Local, TimeZone, Weekday};
+use clap::Parser;
+use cli::Command;
 use file::get_data_dir;
 use summary::{MonthId, NaiveDateExt, Summary};
 use writer::Writer;
 
+mod cli;
 mod file;
 mod parser;
 mod summary;
 mod writer;
 
-#[derive(Debug)]
-enum Command {
-    Link {
-        name: String,
-    },
-    ClockIn,
-    Summary,
-    Binnacle {
-        range: (Bound<NaiveDate>, Bound<NaiveDate>),
-        timezone: FixedOffset,
-    },
-    Edit,
-    Cd,
-    Exec {
-        command: String,
-    },
-}
-
 fn get_shell() -> String {
     std::env::var("SHELL").unwrap_or("sh".to_owned())
 }
 
-fn parse_binnacle_args<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Command> {
-    let mut from = Bound::Unbounded;
-    let mut to = Bound::Unbounded;
-    let mut timezone = None;
-    while let Some(arg) = args.next() {
-        match arg {
-            "--from" | "-f" => {
-                from = Bound::Included(
-                    NaiveDate::parse_from_str(
-                        args.next()
-                            .ok_or_else(|| anyhow!("expected argument value after \"--from\""))?,
-                        "%Y-%m-%d",
-                    )
-                    .context("could not parse \"--from\" date")?,
-                )
-            }
-            "--to" | "-t" => {
-                to = Bound::Included(
-                    NaiveDate::parse_from_str(
-                        args.next()
-                            .ok_or_else(|| anyhow!("expected argument value after \"--to\""))?,
-                        "%Y-%m-%d",
-                    )
-                    .context("could not parse \"--to\" date")?,
-                )
-            }
-            "--timezone" | "-tz" => {
-                timezone = Some(
-                    args.next()
-                        .ok_or_else(|| anyhow!("expected argument value after \"--timezone\""))?
-                        .parse::<FixedOffset>()?,
-                )
-            }
-            arg => Err(anyhow!("unrecognized argument \"{arg}\""))?,
-        }
-    }
-    Ok(Command::Binnacle {
-        range: (from, to),
-        timezone: timezone.unwrap_or_else(|| Local::now().fixed_offset().timezone()),
-    })
-}
-
-fn parse_args(args: Args) -> Result<Command> {
-    let args: Vec<String> = args.skip(1).collect();
-
-    match args
-        .first()
-        .ok_or_else(|| anyhow!("missing command"))?
-        .to_lowercase()
-        .as_str()
-    {
-        "link" => Ok(Command::Link {
-            name: args
-                .get(1)
-                .ok_or(anyhow!("missing \"link name\" argument"))?
-                .to_owned(),
-        }),
-        "in" => Ok(Command::ClockIn),
-        "summary" => Ok(Command::Summary),
-        "edit" => Ok(Command::Edit),
-        "binnacle" | "bitacora" => parse_binnacle_args(args.iter().map(String::as_str).skip(1)),
-        "cd" => Ok(Command::Cd),
-        "exec" => Ok(Command::Exec {
-            command: args
-                .get(1)
-                .ok_or(anyhow!("missing \"shell-command\" argument"))?
-                .to_owned(),
-        }),
-        command => Err(anyhow!("invalid command \"{command}\"")),
-    }
-}
 fn lines(cancel: Receiver<()>) -> Receiver<Option<String>> {
     let (sender, receiver) = mpsc::channel();
     let sender2 = sender.clone();
@@ -198,7 +110,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 .context("error while trying to run editor")?;
             process.wait().context("error while editing file")?;
         }
-        Command::ClockIn => {
+        Command::In => {
             let mut writer = Writer::new(file::require_clockin_file()?)?;
             println!(
                 "{}",
@@ -235,14 +147,14 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 println!("- {}: {}", date, fmt_duration(&day.duration));
             }
         }
-        Command::Binnacle { range, timezone } => {
+        Command::Binnacle { from, to, timezone } => {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap();
             let summary = Summary::summarize(sessions, &timezone);
             let current_date = Local::now().with_timezone(&timezone).date_naive();
 
             let mut last_month = None;
-            for (date, day) in summary.days.range(range) {
+            for (date, day) in summary.days.range((from, to)) {
                 let month = date.month_id();
 
                 if last_month.is_none_or(|last_month| last_month != month) {
@@ -287,19 +199,8 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let command = parse_args(args()).context("error while parsing arguments, usage:
-clockin <command>
-
-commands:
-  - link
-  - in
-  - (binnacle|bitacora) [(--from|-f) <from-date>] [(--to|-t) <to-date>] [(--timezone|-tz) <timezone>]
-      dates in yyyy-mm-dd format
-      timezone in [+-]HH:MM format
-  - edit
-  - cd
-  - exec <shell-command>
-      shell-command is a single argument passed to shell")?;
+    let args = cli::Args::parse();
+    let command = args.command;
 
     let (canceller, cancel) = mpsc::channel();
     ctrlc::set_handler(move || {

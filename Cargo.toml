@@ -2,8 +2,15 @@
 name = "clockin"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 
 [dependencies]
 anyhow = "1.0.97"
 chrono = "0.4.40"
+clap = { version = "4.5.36", features = ["derive"] }
 ctrlc = "3.4.6"
+
+[build-dependencies]
+clap = { version = "4.5.36", features = ["derive"] }
+clap_complete = "4.5.36"
+chrono = "0.4.40"
