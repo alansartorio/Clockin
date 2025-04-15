@@ -20,7 +20,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
 
       in
-      {
+      rec {
         packages =
           let
             derivation =
@@ -75,6 +75,14 @@
               };
             };
           };
+        devShells = {
+          default = pkgs.mkShell {
+            buildInputs = [ pkgs.cargo ];
+          };
+          try = pkgs.mkShell {
+            buildInputs = [ packages.default ];
+          };
+        };
       }
     );
 }
