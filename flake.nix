@@ -38,8 +38,12 @@
                     let
                       baseName = baseNameOf (toString name);
                     in
-                    !(baseName == "flake.nix" || baseName == "target");
+                    !(builtins.elem baseName [
+                      "flake.nix"
+                      "flake.lock"
+                    ]);
                   src = pkgs.lib.cleanSource ./.;
+                  name = "clockin-src";
                 };
                 nativeBuildInputs = [
                   installShellFiles
