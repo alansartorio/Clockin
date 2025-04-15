@@ -18,6 +18,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        pkgsStatic = (import nixpkgs { inherit system; }).pkgsStatic;
 
       in
       rec {
@@ -59,22 +60,22 @@
                 '';
               };
             package = pkgs.callPackage derivation { };
+            packageStatic = pkgsStatic.callPackage derivation { };
           in
           {
             default = package;
             docker = pkgs.dockerTools.buildLayeredImage {
               name = "clockin";
               tag = "latest";
-              contents = with pkgs; [
-                bash
-                nano
+              contents = with pkgsStatic; [
+                busybox
               ];
               config = {
                 Env = [
-                  "SHELL=bash"
-                  "EDITOR=nano"
+                  "SHELL=sh"
+                  "EDITOR=vi"
                 ];
-                Entrypoint = [ "${package}/bin/clockin" ];
+                Entrypoint = [ "${packageStatic}/bin/clockin" ];
               };
             };
           };
@@ -83,7 +84,10 @@
             buildInputs = [ pkgs.cargo ];
           };
           try = pkgs.mkShell {
-            buildInputs = [ packages.default ];
+            buildInputs = [
+              pkgs.busybox
+              packages.default
+            ];
           };
         };
       }
