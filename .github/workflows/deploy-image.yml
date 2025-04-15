@@ -29,5 +29,5 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - run: nix build .#docker
-      - run: nix shell nixpkgs#skopeo --command skopeo copy --dest-creds ./result ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} docker://${{ env.REGISTRY }}/clockin:latest
+      - run: nix shell nixpkgs#skopeo --command skopeo copy --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" oci-archive:result:clockin docker://${{ env.REGISTRY }}/clockin:latest
 
