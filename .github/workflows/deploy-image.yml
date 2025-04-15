@@ -32,7 +32,8 @@ jobs:
       - run: >
           nix shell nixpkgs#skopeo --command
           skopeo --insecure-policy copy
-          --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
+          --dest-username "${{ github.actor }}"
+          --dest-registry-token "${{ secrets.GITHUB_TOKEN }}"
           docker-archive:$(cat docker-image-path)
           docker://${{ env.REGISTRY }}/clockin:latest
 
