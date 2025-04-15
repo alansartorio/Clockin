@@ -68,9 +68,12 @@
               contents = with pkgs; [
                 bash
                 nano
-                neovim
               ];
               config = {
+                Env = [
+                  "SHELL=bash"
+                  "EDITOR=nano"
+                ];
                 Entrypoint = [ "${package}/bin/clockin" ];
               };
             };
