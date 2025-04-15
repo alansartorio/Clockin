@@ -28,6 +28,11 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
-      - run: nix build .#docker
-      - run: nix shell nixpkgs#skopeo --command skopeo copy --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" oci-archive:result:clockin docker://${{ env.REGISTRY }}/clockin:latest
+      - run: nix build .#docker --print-out-paths > docker-image-path
+      - run: >
+          nix shell nixpkgs#skopeo --command
+          skopeo --insecure-policy copy
+            --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
+            docker-archive:$(cat docker-image-path)
+            docker://${{ env.REGISTRY }}/clockin:latest
 
