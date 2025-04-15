@@ -35,5 +35,5 @@ jobs:
           --dest-username "${{ github.actor }}"
           --dest-password "${{ secrets.GITHUB_TOKEN }}"
           docker-archive:$(cat docker-image-path)
-          docker://${{ env.REGISTRY }}/clockin:latest
+          docker://${{ env.REGISTRY }}/${{ github.actor }}/clockin:latest
 
