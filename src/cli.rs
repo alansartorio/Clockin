@@ -17,7 +17,7 @@ fn parse_bound_naive_date(s: &str) -> Result<Bound<NaiveDate>, String> {
 
 #[derive(Debug, Parser)]
 #[command(name = "Clockin")]
-#[command(version = "0.1.0")]
+#[command(version)]
 #[command(about = "Time tracking utility", long_about = None)]
 pub struct Args {
     #[command(subcommand)]
