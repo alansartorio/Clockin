@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::BTreeMap, ops::RangeBounds, time::Duration};
+use std::{cmp::Ordering, collections::{BTreeMap, HashSet}, ops::RangeBounds, time::Duration};
 
 use chrono::{Datelike, Days, Months, NaiveDate, NaiveWeek, TimeZone};
 
@@ -81,7 +81,7 @@ impl NaiveDateExt for NaiveDate {
 
 pub struct Day {
     pub duration: Duration,
-    pub descriptions: Vec<String>,
+    pub descriptions: HashSet<String>,
 }
 
 pub struct Summary {
@@ -118,7 +118,7 @@ impl Summary {
                     date,
                     Day {
                         duration: Duration::ZERO,
-                        descriptions: vec![],
+                        descriptions: HashSet::new(),
                     },
                 );
             }
@@ -127,7 +127,7 @@ impl Summary {
             let last_entry = last_entry.get_mut();
             last_entry.duration += duration;
             if !session.description.is_empty() {
-                last_entry.descriptions.push(session.description);
+                last_entry.descriptions.insert(session.description);
             }
         }
         summary
