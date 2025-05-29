@@ -88,7 +88,7 @@ fn fmt_weekday(day: Weekday) -> &'static str {
     match day {
         Weekday::Mon => "Lunes",
         Weekday::Tue => "Martes",
-        Weekday::Wed => "Miercoles",
+        Weekday::Wed => "Miércoles",
         Weekday::Thu => "Jueves",
         Weekday::Fri => "Viernes",
         Weekday::Sat => "Sabado",
