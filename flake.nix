@@ -74,6 +74,7 @@
                 Env = [
                   "SHELL=sh"
                   "EDITOR=vi"
+                  "PATH=/bin:${packageStatic}/bin"
                 ];
                 Entrypoint = [ "${packageStatic}/bin/clockin" ];
               };
