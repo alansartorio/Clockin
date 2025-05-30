@@ -1,19 +1,18 @@
 use std::{
-    io::stdin,
     os::unix::process::CommandExt,
+    path::Path,
     process,
     sync::mpsc::{self, Receiver},
-    thread,
     time::Duration,
 };
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Datelike, Local, TimeZone, Weekday};
+use chrono::{Datelike, Local, Weekday};
 use clap::Parser;
 use cli::Command;
 use file::get_data_dir;
 use summary::{MonthId, NaiveDateExt, Summary};
-use writer::Writer;
+use writer::write_date;
 
 mod cli;
 mod file;
@@ -23,25 +22,6 @@ mod writer;
 
 fn get_shell() -> String {
     std::env::var("SHELL").unwrap_or("sh".to_owned())
-}
-
-fn lines(cancel: Receiver<()>) -> Receiver<Option<String>> {
-    let (sender, receiver) = mpsc::channel();
-    let sender2 = sender.clone();
-
-    thread::spawn(move || {
-        for line in stdin().lines() {
-            let line = line.unwrap();
-            sender.send(Some(line)).unwrap();
-        }
-        sender.send(None).unwrap();
-    });
-    thread::spawn(move || {
-        cancel.recv().unwrap();
-        sender2.send(None).unwrap();
-    });
-
-    receiver
 }
 
 fn fmt_duration(duration: &Duration) -> String {
@@ -60,10 +40,6 @@ fn fmt_duration_uncertain(duration: &Duration, completed: bool) -> String {
     }
 
     out
-}
-
-fn fmt_datetime<Tz: TimeZone>(dt: &DateTime<Tz>) -> String {
-    dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
 }
 
 fn fmt_month(month: MonthId) -> String {
@@ -96,35 +72,35 @@ fn fmt_weekday(day: Weekday) -> &'static str {
     }
 }
 
-fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
+fn edit_file(path: impl AsRef<Path>) -> Result<()> {
+    let editor = std::env::var("EDITOR").unwrap_or("nano".to_owned());
+    let mut process = process::Command::new(editor)
+        .arg(path.as_ref())
+        .spawn()
+        .context("error while trying to run editor")?;
+    process.wait().context("error while editing file")?;
+    Ok(())
+}
+
+fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
     match command {
         Command::Link { name } => {
             file::create_clockin_file(&name)?;
         }
         Command::Edit => {
-            let path = file::require_clockin_file()?;
-            let editor = std::env::var("EDITOR").unwrap_or("nano".to_owned());
-            let mut process = process::Command::new(editor)
-                .arg(path)
-                .spawn()
-                .context("error while trying to run editor")?;
-            process.wait().context("error while editing file")?;
+            let file = file::require_clockin_file()?;
+            edit_file(file)?;
         }
         Command::In => {
-            let mut writer = Writer::new(file::require_clockin_file()?)?;
             println!(
                 "{}",
                 concat!("==============\n", "= CLOCKED IN =\n", "==============")
             );
-            println!("{}", fmt_datetime(&writer.start));
 
-            let line_receiver = lines(cancel);
-            while let Some(line) = line_receiver.recv().unwrap() {
-                writer.write_line(&line)?;
-            }
-
-            let end = writer.end()?;
-            println!("{}", fmt_datetime(&end));
+            let file = file::require_clockin_file()?;
+            write_date(&file, false)?;
+            edit_file(&file)?;
+            write_date(&file, true)?;
         }
         Command::WeekSummary => {
             let path = file::require_clockin_file()?;
