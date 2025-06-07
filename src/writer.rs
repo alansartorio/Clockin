@@ -7,7 +7,7 @@ fn fmt_datetime<Tz: TimeZone>(time: DateTime<Tz>) -> String {
     time.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
 }
 
-pub fn write_date(path: impl AsRef<Path>, extra_return: bool) -> Result<()> {
+pub fn write_date(path: impl AsRef<Path>, extra_return: bool, prefix: char) -> Result<()> {
     let mut file = File::options()
         .append(true)
         .open(path)
@@ -16,7 +16,7 @@ pub fn write_date(path: impl AsRef<Path>, extra_return: bool) -> Result<()> {
     let start = Local::now();
 
     let start_str = fmt_datetime(start);
-    file.write_all(format!("%-{}\n", start_str).as_bytes())
+    file.write_all(format!("%{prefix}{start_str}\n").as_bytes())
         .context("writing start time")?;
 
     if extra_return {

@@ -98,9 +98,9 @@ fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
             );
 
             let file = file::require_clockin_file()?;
-            write_date(&file, false)?;
+            write_date(&file, false, '-')?;
             edit_file(&file)?;
-            write_date(&file, true)?;
+            write_date(&file, true, '+')?;
         }
         Command::WeekSummary => {
             let path = file::require_clockin_file()?;
