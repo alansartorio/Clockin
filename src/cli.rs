@@ -42,6 +42,15 @@ pub enum Command {
         #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
         timezone: FixedOffset,
     },
+    #[command(about = "analyze working hours")]
+    WorkTimeAnalysis {
+        #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
+        from: Bound<NaiveDate>,
+        #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
+        to: Bound<NaiveDate>,
+        #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
+        timezone: FixedOffset,
+    },
     #[command(about = "open the project times file in the editor")]
     Edit,
     #[command(about = "open a subshell inside the clockin data directory, respects SHELL environment variable")]

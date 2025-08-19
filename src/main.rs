@@ -1,4 +1,5 @@
 use std::{
+    ops::RangeBounds,
     os::unix::process::CommandExt,
     path::Path,
     process,
@@ -7,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use chrono::{Datelike, Local, Weekday};
+use chrono::{Datelike, Local, NaiveTime, TimeDelta, Timelike, Weekday};
 use clap::Parser;
 use cli::Command;
 use file::get_data_dir;
@@ -80,6 +81,10 @@ fn edit_file(path: impl AsRef<Path>) -> Result<()> {
         .context("error while trying to run editor")?;
     process.wait().context("error while editing file")?;
     Ok(())
+}
+
+fn fmt_hours_mins(t: NaiveTime) -> String {
+    format!("{:02}:{:02}", t.hour(), t.minute())
 }
 
 fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
@@ -155,6 +160,58 @@ fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
                 for description in &day.descriptions {
                     println!("\t- {}\n", description);
                 }
+            }
+        }
+        Command::WorkTimeAnalysis { from, to, timezone } => {
+            let path = file::require_clockin_file()?;
+
+            const ANALYSIS_INTERVAL: TimeDelta = TimeDelta::minutes(30);
+            const SLOTS_PER_DAY: usize =
+                (TimeDelta::days(1).num_minutes() / ANALYSIS_INTERVAL.num_minutes()) as usize;
+            // one counter every interval
+            let mut results = [TimeDelta::zero(); SLOTS_PER_DAY];
+
+            let sessions = parser::parse_file(path)
+                .unwrap()
+                .filter(|s| (from, to).contains(&s.start.with_timezone(&timezone).date_naive()))
+                .map(|s| s.naive_local())
+                .flat_map(|s| s.split_at_days())
+                .map(|s| s.start.time()..s.end.time());
+
+            for session in sessions {
+                for (i, result) in results.iter_mut().enumerate() {
+                    let interval_start = NaiveTime::MIN + ANALYSIS_INTERVAL * (i as i32);
+                    let interval_end = interval_start + ANALYSIS_INTERVAL;
+                    // this fix is needed because "session end" is exclusive but NaiveTime wraps
+                    // around at "24:00:00"
+                    let fix_end = |t| {
+                        if t == NaiveTime::MIN {
+                            NaiveTime::MIN - TimeDelta::nanoseconds(1)
+                        } else {
+                            t
+                        }
+                    };
+                    let overlap = (fix_end(session.end).min(fix_end(interval_end))
+                        - session.start.max(interval_start))
+                    .max(TimeDelta::zero());
+                    *result += overlap;
+                }
+            }
+
+            let total: TimeDelta = results.iter().sum();
+
+            for (i, result) in results.iter().enumerate() {
+                let interval_start = NaiveTime::MIN + ANALYSIS_INTERVAL * (i as i32);
+                let interval_end = interval_start + ANALYSIS_INTERVAL;
+                let _total_hours = result.num_seconds() as f64 / 3600f64;
+                let percentage = result.num_seconds() as f64 / total.num_seconds() as f64;
+                println!(
+                    "{}-{}: {:.02}% {}",
+                    fmt_hours_mins(interval_start),
+                    fmt_hours_mins(interval_end),
+                    100.0 * percentage,
+                    "#".repeat((800.0 * percentage).round() as usize)
+                );
             }
         }
         Command::Cd => {
