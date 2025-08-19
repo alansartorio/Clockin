@@ -30,7 +30,7 @@
                 installShellFiles,
               }:
               pkgs.rustPlatform.buildRustPackage {
-                version = "0.1.2";
+                version = "0.2.0";
                 pname = "clockin";
                 cargoLock.lockFile = ./Cargo.lock;
                 src = pkgs.lib.cleanSourceWith {
