@@ -43,8 +43,33 @@ fn extract_macro(line: &str, prefix: char) -> Option<DateTime<FixedOffset>> {
         .map(|d| DateTime::parse_from_rfc3339(d).unwrap())
 }
 
+pub struct MaybeFinishedSessionTZ<TZ: TimeZone> {
+    pub start: DateTime<TZ>,
+    pub end: Option<DateTime<TZ>>,
+    pub description: String,
+}
+
+impl MaybeFinishedSessionTZ<FixedOffset> {
+    fn into_finished_now(self) -> SessionTZ<FixedOffset> {
+        let MaybeFinishedSessionTZ {
+            start,
+            end,
+            description,
+        } = self;
+        SessionTZ {
+            start,
+            end: end.unwrap_or(Local::now().fixed_offset()),
+            description,
+        }
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.end.is_some()
+    }
+}
+
 impl Iterator for SessionIterator {
-    type Item = Session;
+    type Item = MaybeFinishedSessionTZ<FixedOffset>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = 'a: {
@@ -57,7 +82,7 @@ impl Iterator for SessionIterator {
         };
 
         let mut description = String::new();
-        let mut end = Local::now().fixed_offset();
+        let mut end = None;
 
         loop {
             let Some(line) = self.lines.next() else {
@@ -65,7 +90,7 @@ impl Iterator for SessionIterator {
             };
             let line = line.unwrap();
             if let Some(m) = extract_macro(&line, '+') {
-                end = m;
+                end.replace(m);
                 break;
             } else {
                 description.push_str(&line);
@@ -73,11 +98,17 @@ impl Iterator for SessionIterator {
             }
         }
 
-        Some(Session {
+        Some(MaybeFinishedSessionTZ {
             start,
             end,
             description: description.trim_end().to_owned(),
         })
+    }
+}
+
+impl SessionIterator {
+    pub fn as_finished_now(self) -> impl Iterator<Item = Session> {
+        self.map(|s| s.into_finished_now())
     }
 }
 

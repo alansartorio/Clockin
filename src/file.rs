@@ -8,25 +8,7 @@ use std::{
 
 use anyhow::{Result, anyhow};
 
-fn find_clockin_file() -> Option<PathBuf> {
-    let project = std::env::var("CLOCKIN_PROJECT")
-        .ok()
-        .map(|project_name| {
-            let mut path = get_data_dir();
-            path.push(project_name);
-            path
-        })
-        .map(|path| {
-            path.exists()
-                .then_some(path)
-                .ok_or(anyhow!("the specified CLOCKIN_PROJECT does not exist"))
-        })
-        .transpose()
-        .unwrap();
-    if project.is_some() {
-        return project;
-    }
-
+fn find_dot_clockin_file() -> Option<PathBuf> {
     let first_dir = current_dir().unwrap();
     let mut maybe_dir = Some(first_dir.as_path());
 
@@ -40,6 +22,44 @@ fn find_clockin_file() -> Option<PathBuf> {
     }
 
     None
+}
+
+fn get_var_project() -> Option<String> {
+    std::env::var("CLOCKIN_PROJECT").ok()
+}
+
+fn find_closest_clockin_file() -> Option<PathBuf> {
+    get_var_project()
+        .map(|project_name| {
+            let mut path = get_data_dir();
+            path.push(project_name);
+            path
+        })
+        .map(|path| {
+            path.exists()
+                .then_some(path)
+                .ok_or(anyhow!("the specified CLOCKIN_PROJECT does not exist"))
+        })
+        .transpose()
+        .unwrap()
+        .or_else(find_dot_clockin_file)
+}
+
+fn find_deepest_clockin_file() -> Option<PathBuf> {
+    find_closest_clockin_file()
+        .map(|path| {
+            if path.is_symlink() {
+                fs::read_link(path)
+            } else {
+                Ok(path)
+            }
+        })
+        .transpose()
+        .expect("error while traversing symlink")
+}
+
+fn find_clockin_file() -> Option<PathBuf> {
+    find_closest_clockin_file()
 }
 
 fn get_var_path(name: &str) -> Option<PathBuf> {
@@ -77,4 +97,8 @@ pub fn create_clockin_file(name: &str) -> Result<PathBuf> {
 
 pub fn require_clockin_file() -> Result<PathBuf> {
     find_clockin_file().ok_or(anyhow!(".clockin file not found"))
+}
+
+pub fn require_clockin_project_file() -> Result<PathBuf> {
+    find_deepest_clockin_file().ok_or(anyhow!("clockin project file not found"))
 }

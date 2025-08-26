@@ -18,6 +18,7 @@ use writer::write_date;
 mod cli;
 mod file;
 mod parser;
+mod subscribe;
 mod summary;
 mod writer;
 
@@ -87,7 +88,7 @@ fn fmt_hours_mins(t: NaiveTime) -> String {
     format!("{:02}:{:02}", t.hour(), t.minute())
 }
 
-fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
+fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
     match command {
         Command::Link { name } => {
             file::create_clockin_file(&name)?;
@@ -109,7 +110,7 @@ fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
         }
         Command::WeekSummary => {
             let path = file::require_clockin_file()?;
-            let sessions = parser::parse_file(path).unwrap();
+            let sessions = parser::parse_file(path).unwrap().as_finished_now();
             let summary = Summary::summarize(sessions, &Local);
 
             let mut last_week = None;
@@ -130,7 +131,7 @@ fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
         }
         Command::Summary { from, to, timezone } => {
             let path = file::require_clockin_file()?;
-            let sessions = parser::parse_file(path).unwrap();
+            let sessions = parser::parse_file(path).unwrap().as_finished_now();
             let summary = Summary::summarize(sessions, &timezone);
             let current_date = Local::now().with_timezone(&timezone).date_naive();
 
@@ -173,6 +174,7 @@ fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
 
             let sessions = parser::parse_file(path)
                 .unwrap()
+                .as_finished_now()
                 .filter(|s| (from, to).contains(&s.start.with_timezone(&timezone).date_naive()))
                 .map(|s| s.naive_local())
                 .flat_map(|s| s.split_at_days())
@@ -213,6 +215,30 @@ fn run(command: Command, _cancel: Receiver<()>) -> Result<()> {
                     "#".repeat((800.0 * percentage).round() as usize)
                 );
             }
+        }
+        Command::Subscribe => {
+            let path = file::require_clockin_project_file()?;
+            subscribe::subscribe(&path, cancel)?;
+        }
+        Command::GetWorkedTime { specification } => {
+            let path = file::require_clockin_file()?;
+            let sessions = parser::parse_file(path).unwrap().as_finished_now();
+
+            let matching_sessions: Vec<_> = match specification {
+                cli::GetWorkedTimeCommand::Today { timezone } => {
+                    let today = Local::now().with_timezone(&timezone).date_naive();
+                    sessions
+                        .filter(|s| s.start.with_timezone(&timezone).date_naive() == today)
+                        .collect()
+                }
+                cli::GetWorkedTimeCommand::ByDateRange { from, to, timezone } => sessions
+                    .filter(|s| (from, to).contains(&s.start.with_timezone(&timezone).date_naive()))
+                    .collect(),
+                cli::GetWorkedTimeCommand::LastSession => sessions.last().into_iter().collect(),
+            };
+
+            let worked_time: TimeDelta = matching_sessions.into_iter().map(|s| s.duration()).sum();
+            println!("{}", worked_time.as_seconds_f64() as u64);
         }
         Command::Cd => {
             Err(process::Command::new(get_shell())

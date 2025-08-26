@@ -9,6 +9,8 @@ anyhow = "1.0.99"
 chrono = "0.4.41"
 clap = { version = "4.5.45", features = ["derive"] }
 ctrlc = { version = "3.4.7", features = ["termination"] }
+notify = "8.2.0"
+notify-debouncer-full = "0.6.0"
 
 [build-dependencies]
 clap = { version = "4.5.45", features = ["derive"] }

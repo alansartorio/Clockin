@@ -33,7 +33,10 @@ pub enum Command {
     #[command(about = "start a time tracking session")]
     In,
     WeekSummary,
-    #[command(alias = "bitacora", about = "print a report of time spent on the project broken down by month and by day")]
+    #[command(
+        alias = "bitacora",
+        about = "print a report of time spent on the project broken down by month and by day"
+    )]
     Summary {
         #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
         from: Bound<NaiveDate>,
@@ -51,12 +54,43 @@ pub enum Command {
         #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
         timezone: FixedOffset,
     },
+    #[command(about = "subscribe to events")]
+    Subscribe,
+    #[command(about = "get worked time")]
+    GetWorkedTime {
+        #[command(subcommand)]
+        specification: GetWorkedTimeCommand,
+    },
     #[command(about = "open the project times file in the editor")]
     Edit,
-    #[command(about = "open a subshell inside the clockin data directory, respects SHELL environment variable")]
+    #[command(
+        about = "open a subshell inside the clockin data directory, respects SHELL environment variable"
+    )]
     Cd,
-    #[command(about = "execute a command inside the clockin data directory, useful for syncing/git commands, respects EDITOR environment variable")]
+    #[command(
+        about = "execute a command inside the clockin data directory, useful for syncing/git commands, respects EDITOR environment variable"
+    )]
     Exec {
         command: String,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum GetWorkedTimeCommand {
+    #[command(about = "by date range")]
+    ByDateRange {
+        #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
+        from: Bound<NaiveDate>,
+        #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
+        to: Bound<NaiveDate>,
+        #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
+        timezone: FixedOffset,
+    },
+    #[command(about = "today")]
+    Today {
+        #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
+        timezone: FixedOffset,
+    },
+    #[command(about = "last session")]
+    LastSession,
 }
