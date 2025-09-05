@@ -156,8 +156,8 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 println!(
                     "- {} {:02}/{:02} ({})\n",
                     fmt_weekday(date.weekday()),
-                    date.day0() + 1,
-                    date.month0() + 1,
+                    date.day(),
+                    date.month(),
                     fmt_duration_uncertain(&day.duration, &current_date > date)
                 );
                 for description in &day.descriptions {
