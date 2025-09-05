@@ -5,7 +5,9 @@ use std::{
 };
 
 use anyhow::Result;
-use chrono::{DateTime, Duration, FixedOffset, Local, NaiveDateTime, NaiveTime, TimeZone};
+use chrono::{
+    DateTime, Duration, FixedOffset, Local, NaiveDateTime, NaiveTime, TimeDelta, TimeZone,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct NaiveSession {
@@ -106,9 +108,40 @@ impl Iterator for SessionIterator {
     }
 }
 
-impl SessionIterator {
-    pub fn as_finished_now(self) -> impl Iterator<Item = Session> {
+pub trait SessionIteratorClosingExt {
+    fn as_finished_now(self) -> impl Iterator<Item = Session>;
+}
+impl<I: Iterator<Item = MaybeFinishedSessionTZ<FixedOffset>>> SessionIteratorClosingExt for I {
+    fn as_finished_now(self) -> impl Iterator<Item = Session> {
         self.map(|s| s.into_finished_now())
+    }
+}
+
+pub trait NaiveSessionIteratorExt {
+    fn cut_at_days(self) -> impl Iterator<Item = NaiveSession>;
+    fn and_local_timezone<TZ: TimeZone>(self, tz: TZ) -> impl Iterator<Item = SessionTZ<TZ>>;
+}
+impl<I: Iterator<Item = NaiveSession>> NaiveSessionIteratorExt for I {
+    fn cut_at_days(self) -> impl Iterator<Item = NaiveSession> {
+        self.flat_map(|s| s.split_at_days())
+    }
+
+    fn and_local_timezone<TZ: TimeZone>(self, tz: TZ) -> impl Iterator<Item = SessionTZ<TZ>> {
+        self.map(move |s| s.and_local_timezone(tz.clone()))
+    }
+}
+
+pub trait SessionIteratorExt {
+    fn naive_local(self) -> impl Iterator<Item = NaiveSession>;
+    fn with_timezone<TZ: TimeZone>(self, tz: &TZ) -> impl Iterator<Item = SessionTZ<TZ>>;
+}
+impl<TZ: TimeZone, I: Iterator<Item = SessionTZ<TZ>>> SessionIteratorExt for I {
+    fn naive_local(self) -> impl Iterator<Item = NaiveSession> {
+        self.map(|s| s.naive_local())
+    }
+
+    fn with_timezone<TZ2: TimeZone>(self, tz: &TZ2) -> impl Iterator<Item = SessionTZ<TZ2>> {
+        self.map(|s| s.with_timezone(tz))
     }
 }
 
@@ -151,6 +184,18 @@ impl NaiveSession {
                 end: self.end.min(tmrw.and_time(NaiveTime::MIN)),
                 description: self.description.clone(),
             })
+    }
+
+    pub fn and_local_timezone<TZ: TimeZone>(self, tz: TZ) -> SessionTZ<TZ> {
+        SessionTZ::<TZ> {
+            start: self.start.and_local_timezone(tz.clone()).unwrap(),
+            end: self.end.and_local_timezone(tz).unwrap(),
+            description: self.description,
+        }
+    }
+
+    pub fn duration(&self) -> TimeDelta {
+        self.end - self.start
     }
 }
 

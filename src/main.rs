@@ -15,6 +15,8 @@ use file::get_data_dir;
 use summary::{MonthId, NaiveDateExt, Summary};
 use writer::write_date;
 
+use crate::parser::SessionIteratorClosingExt;
+
 mod cli;
 mod file;
 mod parser;

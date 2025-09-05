@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::{BTreeMap, HashSet}, ops::RangeBounds, tim
 
 use chrono::{Datelike, Days, Months, NaiveDate, NaiveWeek, TimeZone};
 
-use crate::parser::Session;
+use crate::parser::{NaiveSessionIteratorExt, Session, SessionIteratorExt};
 
 #[derive(Debug, Clone, Copy, Eq)]
 pub struct FixedWeek(NaiveWeek);
@@ -106,8 +106,8 @@ impl Summary {
             days: Default::default(),
         };
 
-        for session in sessions {
-            let date = session.start.with_timezone(timezone).date_naive();
+        for session in sessions.with_timezone(timezone).naive_local().cut_at_days() {
+            let date = session.start.date();
             let duration = session.duration().to_std().unwrap();
             if summary
                 .days
