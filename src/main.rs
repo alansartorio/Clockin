@@ -15,7 +15,7 @@ use file::get_data_dir;
 use summary::{MonthId, NaiveDateExt, Summary};
 use writer::write_date;
 
-use crate::parser::SessionIteratorClosingExt;
+use crate::parser::{NaiveSessionIteratorExt, SessionIteratorClosingExt, SessionIteratorExt};
 
 mod cli;
 mod file;
@@ -226,20 +226,29 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap().as_finished_now();
 
-            let matching_sessions: Vec<_> = match specification {
+            let worked_time: TimeDelta = match specification {
                 cli::GetWorkedTimeCommand::Today { timezone } => {
                     let today = Local::now().with_timezone(&timezone).date_naive();
                     sessions
-                        .filter(|s| s.start.with_timezone(&timezone).date_naive() == today)
-                        .collect()
+                        .with_timezone(&timezone)
+                        .naive_local()
+                        .cut_at_days()
+                        .filter(|s| s.start.date() == today)
+                        .map(|s| s.duration())
+                        .sum()
                 }
                 cli::GetWorkedTimeCommand::ByDateRange { from, to, timezone } => sessions
-                    .filter(|s| (from, to).contains(&s.start.with_timezone(&timezone).date_naive()))
-                    .collect(),
-                cli::GetWorkedTimeCommand::LastSession => sessions.last().into_iter().collect(),
+                    .with_timezone(&timezone)
+                    .naive_local()
+                    .cut_at_days()
+                    .filter(|s| (from, to).contains(&s.start.date()))
+                    .map(|s| s.duration())
+                    .sum(),
+                cli::GetWorkedTimeCommand::LastSession => {
+                    sessions.last().into_iter().map(|s| s.duration()).sum()
+                }
             };
 
-            let worked_time: TimeDelta = matching_sessions.into_iter().map(|s| s.duration()).sum();
             println!("{}", worked_time.as_seconds_f64() as u64);
         }
         Command::Cd => {
