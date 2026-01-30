@@ -44,6 +44,8 @@ pub enum Command {
         to: Bound<NaiveDate>,
         #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
         timezone: FixedOffset,
+        #[arg(short, long, default_value_t = 1)]
+        version: u32,
     },
     #[command(about = "analyze working hours")]
     WorkTimeAnalysis {
