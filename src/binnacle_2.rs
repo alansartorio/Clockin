@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use chrono::{Datelike, FixedOffset, NaiveDate, TimeZone};
+use chrono::{FixedOffset, NaiveDate, TimeZone};
 use itertools::Itertools;
 
 use crate::{
     binnacle_body_parser::{self, SessionWithBody},
-    format_util::{fmt_duration_uncertain, fmt_month, fmt_weekday},
+    format_util::{fmt_duration_uncertain, fmt_month},
     parser::{NaiveSessionIteratorExt, SessionIteratorExt, SessionTZ},
     summary::{MonthId, NaiveDateExt},
 };
@@ -110,18 +110,35 @@ pub fn process(
     }
 }
 
+fn print_sub_projects(binnacle_data: &BinnacleData) {
+    dbg!(
+        binnacle_data
+            .months
+            .iter()
+            .flat_map(|m| &m.days)
+            .flat_map(|d| &d.sub_projects)
+            .map(|sp| &sp.sub_project_name)
+            .unique()
+            .collect_vec()
+    );
+}
+
 pub fn format(binnacle_data: BinnacleData, current_date: NaiveDate) {
-    for month in binnacle_data.months {
+    for month in &binnacle_data.months {
         println!(
             "## {} ({})\n",
             fmt_month(month.id),
             fmt_duration_uncertain(&month.total_time, current_date > month.id.last_day())
         );
 
-        for day in month.days {
+        for day in &month.days {
             println!("{}\n", day.date.format("%d/%m/%Y"));
-            for sub_project in day.sub_projects {
-                println!("({}: {} hs)\n", sub_project.sub_project_name, fmt_duration_uncertain(&sub_project.info.total_time, current_date > day.date));
+            for sub_project in &day.sub_projects {
+                println!(
+                    "({}: {} hs)\n",
+                    sub_project.sub_project_name,
+                    fmt_duration_uncertain(&sub_project.info.total_time, current_date > day.date)
+                );
                 for task in sub_project.info.tasks.iter().unique() {
                     println!("\t- {}\n", task.subject);
                 }
@@ -129,4 +146,5 @@ pub fn format(binnacle_data: BinnacleData, current_date: NaiveDate) {
             println!("\n");
         }
     }
+    //print_sub_projects(&binnacle_data);
 }
