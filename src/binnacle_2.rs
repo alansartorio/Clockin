@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{ops::{Bound, RangeBounds}, time::Duration};
 
 use chrono::{FixedOffset, NaiveDate, TimeZone};
 use itertools::Itertools;
@@ -47,6 +47,8 @@ pub struct BinnacleData {
 
 pub fn process(
     sessions: impl Iterator<Item = SessionTZ<FixedOffset>>,
+    from: Bound<NaiveDate>,
+    to: Bound<NaiveDate>,
     timezone: &impl TimeZone,
 ) -> BinnacleData {
     BinnacleData {
@@ -54,6 +56,7 @@ pub fn process(
             .with_timezone(timezone)
             .naive_local()
             .cut_at_days()
+            .filter(|s| (from, to).contains(&s.start.date()))
             .map(|s| SessionWithBody {
                 body: binnacle_body_parser::parse(&s.description)
                     .unwrap()

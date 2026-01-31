@@ -127,7 +127,7 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                     }
                 }
                 2 => {
-                    let data = binnacle_2::process(sessions, &timezone);
+                    let data = binnacle_2::process(sessions, from, to, &timezone);
                     binnacle_2::format(data, current_date);
                 }
                 _ => {
