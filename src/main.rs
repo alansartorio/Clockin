@@ -2,23 +2,27 @@ use std::{
     ops::RangeBounds,
     os::unix::process::CommandExt,
     path::Path,
-    process,
+    process::{self, exit},
     sync::mpsc::{self, Receiver},
-    time::Duration,
 };
 
 use anyhow::{Context, Result};
-use chrono::{Datelike, Local, NaiveTime, TimeDelta, Timelike, Weekday};
+use chrono::{Datelike, Local, NaiveTime, TimeDelta};
 use clap::Parser;
 use cli::Command;
 use file::get_data_dir;
-use summary::{MonthId, NaiveDateExt, Summary};
+use summary::{NaiveDateExt, Summary};
 use writer::write_date;
 
-use crate::parser::{NaiveSessionIteratorExt, SessionIteratorClosingExt, SessionIteratorExt};
+use crate::{
+    format_util::{fmt_duration, fmt_duration_uncertain, fmt_hours_mins, fmt_month, fmt_weekday}, parser::{NaiveSessionIteratorExt, SessionIteratorClosingExt, SessionIteratorExt}
+};
 
+mod binnacle_2;
+mod binnacle_body_parser;
 mod cli;
 mod file;
+mod format_util;
 mod parser;
 mod subscribe;
 mod summary;
@@ -26,54 +30,6 @@ mod writer;
 
 fn get_shell() -> String {
     std::env::var("SHELL").unwrap_or("sh".to_owned())
-}
-
-fn fmt_duration(duration: &Duration) -> String {
-    let duration = duration.as_secs();
-    let hours = duration / (60 * 60);
-    let total_minutes = duration / 60;
-    let minutes = total_minutes - hours * 60;
-    let seconds = duration - total_minutes * 60;
-    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
-}
-
-fn fmt_duration_uncertain(duration: &Duration, completed: bool) -> String {
-    let mut out = fmt_duration(duration);
-    if !completed {
-        out.push_str(" (incompleto)");
-    }
-
-    out
-}
-
-fn fmt_month(month: MonthId) -> String {
-    let month_name = [
-        "Enero",
-        "Febrero",
-        "Marzo",
-        "Abril",
-        "Mayo",
-        "Junio",
-        "Julio",
-        "Agosto",
-        "Septiembre",
-        "Octubre",
-        "Noviembre",
-        "Diciembre",
-    ][month.month() as usize];
-    format!("{} {}", month_name, month.year())
-}
-
-fn fmt_weekday(day: Weekday) -> &'static str {
-    match day {
-        Weekday::Mon => "Lunes",
-        Weekday::Tue => "Martes",
-        Weekday::Wed => "Miércoles",
-        Weekday::Thu => "Jueves",
-        Weekday::Fri => "Viernes",
-        Weekday::Sat => "Sabado",
-        Weekday::Sun => "Domingo",
-    }
 }
 
 fn edit_file(path: impl AsRef<Path>) -> Result<()> {
@@ -84,10 +40,6 @@ fn edit_file(path: impl AsRef<Path>) -> Result<()> {
         .context("error while trying to run editor")?;
     process.wait().context("error while editing file")?;
     Ok(())
-}
-
-fn fmt_hours_mins(t: NaiveTime) -> String {
-    format!("{:02}:{:02}", t.hour(), t.minute())
 }
 
 fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
@@ -131,37 +83,56 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                 println!("- {}: {}", date, fmt_duration(&day.duration));
             }
         }
-        Command::Summary { from, to, timezone } => {
+        Command::Summary {
+            from,
+            to,
+            timezone,
+            version,
+        } => {
             let path = file::require_clockin_file()?;
             let sessions = parser::parse_file(path).unwrap().as_finished_now();
-            let summary = Summary::summarize(sessions, &timezone);
             let current_date = Local::now().with_timezone(&timezone).date_naive();
 
-            let mut last_month = None;
-            for (date, day) in summary.days.range((from, to)) {
-                let month = date.month_id();
+            match version {
+                1 => {
+                    let summary = Summary::summarize(sessions, &timezone);
 
-                if last_month.is_none_or(|last_month| last_month != month) {
-                    last_month = Some(month);
-                    println!(
-                        "## {} ({})\n",
-                        fmt_month(month),
-                        fmt_duration_uncertain(
-                            &summary.duration(month.first_day()..=month.last_day()),
-                            current_date > month.last_day()
-                        )
-                    );
+                    let mut last_month = None;
+                    for (date, day) in summary.days.range((from, to)) {
+                        let month = date.month_id();
+
+                        let month_changed = last_month.is_none_or(|last_month| last_month != month);
+                        if month_changed {
+                            last_month = Some(month);
+                            println!(
+                                "## {} ({})\n",
+                                fmt_month(month),
+                                fmt_duration_uncertain(
+                                    &summary.duration(month.first_day()..=month.last_day()),
+                                    current_date > month.last_day()
+                                )
+                            );
+                        }
+
+                        println!(
+                            "- {} {:02}/{:02} ({})\n",
+                            fmt_weekday(date.weekday()),
+                            date.day(),
+                            date.month(),
+                            fmt_duration_uncertain(&day.duration, &current_date > date)
+                        );
+                        for description in &day.descriptions {
+                            println!("\t- {}\n", description);
+                        }
+                    }
                 }
-
-                println!(
-                    "- {} {:02}/{:02} ({})\n",
-                    fmt_weekday(date.weekday()),
-                    date.day(),
-                    date.month(),
-                    fmt_duration_uncertain(&day.duration, &current_date > date)
-                );
-                for description in &day.descriptions {
-                    println!("\t- {}\n", description);
+                2 => {
+                    let data = binnacle_2::process(sessions, &timezone);
+                    binnacle_2::format(data, current_date);
+                }
+                _ => {
+                    println!("unknown version {version}");
+                    exit(1);
                 }
             }
         }
