@@ -139,7 +139,7 @@ pub fn format(binnacle_data: BinnacleData, current_date: NaiveDate) {
             println!("{}\n", day.date.format("%d/%m/%Y"));
             for sub_project in &day.sub_projects {
                 println!(
-                    "({}: {} hs)\n",
+                    "- ({}: {} hs)\n",
                     sub_project.sub_project_name,
                     fmt_duration_uncertain(&sub_project.info.total_time, current_date > day.date)
                 );
