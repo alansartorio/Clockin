@@ -1,4 +1,7 @@
-use std::{ops::{Bound, RangeBounds}, time::Duration};
+use std::{
+    ops::{Bound, RangeBounds},
+    time::Duration,
+};
 
 use chrono::{FixedOffset, NaiveDate, TimeZone};
 use itertools::Itertools;
@@ -143,7 +146,13 @@ pub fn format(binnacle_data: BinnacleData, current_date: NaiveDate) {
                     sub_project.sub_project_name,
                     fmt_duration_uncertain(&sub_project.info.total_time, current_date > day.date)
                 );
-                for task in sub_project.info.tasks.iter().unique() {
+                for task in sub_project
+                    .info
+                    .tasks
+                    .iter()
+                    .filter(|t| !t.subject.is_empty())
+                    .unique()
+                {
                     println!("\t- {}\n", task.subject);
                 }
             }
