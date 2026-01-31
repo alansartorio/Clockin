@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use crate::{
     binnacle_body_parser::{self, SessionWithBody},
-    format_util::{fmt_duration_uncertain, fmt_month},
+    format_util::{fmt_duration_uncertain, fmt_duration_uncertain_with_hs, fmt_month},
     parser::{NaiveSessionIteratorExt, SessionIteratorExt, SessionTZ},
     summary::{MonthId, NaiveDateExt},
 };
@@ -142,9 +142,9 @@ pub fn format(binnacle_data: BinnacleData, current_date: NaiveDate) {
             println!("{}\n", day.date.format("%d/%m/%Y"));
             for sub_project in &day.sub_projects {
                 println!(
-                    "- ({}: {} hs)\n",
+                    "- ({}: {})\n",
                     sub_project.sub_project_name,
-                    fmt_duration_uncertain(&sub_project.info.total_time, current_date > day.date)
+                    fmt_duration_uncertain_with_hs(&sub_project.info.total_time, current_date > day.date)
                 );
                 for task in sub_project
                     .info

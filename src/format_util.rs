@@ -24,6 +24,16 @@ pub fn fmt_duration_uncertain(duration: &Duration, completed: bool) -> String {
     out
 }
 
+pub fn fmt_duration_uncertain_with_hs(duration: &Duration, completed: bool) -> String {
+    let mut out = fmt_duration(duration);
+    out.push_str(" hs");
+    if !completed {
+        out.push_str(" (incompleto)");
+    }
+
+    out
+}
+
 pub fn fmt_month(month: MonthId) -> String {
     let month_name = [
         "Enero",
