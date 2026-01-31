@@ -86,7 +86,7 @@ pub fn process(
                                         total_time: Duration::ZERO,
                                         tasks: vec![],
                                     },
-                                    |mut acc, sub_project, task| {
+                                    |mut acc, _sub_project, task| {
                                         acc.total_time += task.session.duration().to_std().unwrap();
                                         acc.tasks.push(Task {
                                             subject: task.body.subject.to_owned(),
@@ -113,6 +113,7 @@ pub fn process(
     }
 }
 
+#[allow(unused)]
 fn print_sub_projects(binnacle_data: &BinnacleData) {
     dbg!(
         binnacle_data
