@@ -28,14 +28,14 @@ pub struct SessionWithBody<Session> {
 }
 
 pub fn parse(body_str: &str) -> Result<Body<'_>, ParseError> {
-    match body_str.find(": ") {
-        None | Some(0) => Ok(Body {
+    match body_str.find(":") {
+        None => Ok(Body {
             sub_project: None,
             subject: body_str,
         }),
         Some(colon_idx) => Ok(Body {
-            sub_project: Some(&body_str[..colon_idx]),
-            subject: &body_str[colon_idx + 2..],
+            sub_project: (colon_idx > 0).then_some(&body_str[..colon_idx]),
+            subject: body_str[colon_idx + 1..].trim_start(),
         }),
     }
 }
