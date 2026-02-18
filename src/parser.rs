@@ -100,10 +100,13 @@ impl Iterator for SessionIterator {
             }
         }
 
+        // remove last newline
+        assert!(description.pop().is_none_or(|ch| ch == '\n'));
+
         Some(MaybeFinishedSessionTZ {
             start,
             end,
-            description: description.trim_end().to_owned(),
+            description: description.to_owned(),
         })
     }
 }
