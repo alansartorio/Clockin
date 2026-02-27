@@ -56,6 +56,15 @@ pub enum Command {
         #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
         timezone: FixedOffset,
     },
+    #[command(about = "show the time taken by task ordered by duration")]
+    ListLongestTasks {
+        #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
+        from: Bound<NaiveDate>,
+        #[arg(short, long, default_value = UNBOUNDED_VALUE, value_parser = parse_bound_naive_date)]
+        to: Bound<NaiveDate>,
+        #[arg(long, default_value_t = Local::now().fixed_offset().timezone())]
+        timezone: FixedOffset,
+    },
     #[command(about = "subscribe to events")]
     Subscribe,
     #[command(about = "get worked time")]

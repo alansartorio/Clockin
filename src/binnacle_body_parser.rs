@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct OwnedBody {
     pub sub_project: Option<String>,
     pub subject: String,
@@ -14,6 +15,7 @@ impl<'a> Body<'a> {
     }
 }
 
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Body<'a> {
     pub sub_project: Option<&'a str>,
     pub subject: &'a str,

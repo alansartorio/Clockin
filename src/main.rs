@@ -11,11 +11,14 @@ use chrono::{Datelike, Local, NaiveTime, TimeDelta};
 use clap::Parser;
 use cli::Command;
 use file::get_data_dir;
+use itertools::Itertools;
 use summary::{NaiveDateExt, Summary};
 use writer::write_date;
 
 use crate::{
-    format_util::{fmt_duration, fmt_duration_uncertain, fmt_hours_mins, fmt_month, fmt_weekday}, parser::{NaiveSessionIteratorExt, SessionIteratorClosingExt, SessionIteratorExt}
+    binnacle_body_parser::OwnedBody,
+    format_util::{fmt_duration, fmt_duration_uncertain, fmt_hours_mins, fmt_month, fmt_weekday},
+    parser::{NaiveSessionIteratorExt, SessionIteratorClosingExt, SessionIteratorExt},
 };
 
 mod binnacle_2;
@@ -188,6 +191,40 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
                     "#".repeat((800.0 * percentage).round() as usize)
                 );
             }
+        }
+        Command::ListLongestTasks { from, to, timezone } => {
+            let path = file::require_clockin_file()?;
+
+            parser::parse_file(path)
+                .unwrap()
+                .as_finished_now()
+                .filter(|s| (from, to).contains(&s.start.with_timezone(&timezone).date_naive()))
+                .map(|s| s.naive_local())
+                .into_grouping_map_by(|s| {
+                    binnacle_body_parser::parse(&s.description)
+                        .unwrap()
+                        .to_owned()
+                })
+                .fold(TimeDelta::zero(), |acc, _, session| {
+                    acc + session.duration()
+                })
+                .into_iter()
+                .into_group_map_by(|(task, _)| task.sub_project.clone())
+                .into_iter()
+                .for_each(|(subproject, tasks)| {
+                    if let Some(subproject) = subproject {
+                        println!("\n# Project: {subproject}");
+                    } else {
+                        println!("\n# Uncategorized:");
+                    }
+
+                    tasks
+                        .into_iter()
+                        .sorted_by_key(|(_, duration)| *duration)
+                        .for_each(|(OwnedBody { subject, .. }, duration)| {
+                            println!("{subject}: {}", fmt_duration(&duration.to_std().unwrap()))
+                        });
+                });
         }
         Command::Subscribe => {
             let path = file::require_clockin_project_file()?;
