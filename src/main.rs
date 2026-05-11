@@ -17,8 +17,11 @@ use writer::write_date;
 
 use crate::{
     binnacle_body_parser::OwnedBody,
+    file::remove_last_content_line,
     format_util::{fmt_duration, fmt_duration_uncertain, fmt_hours_mins, fmt_month, fmt_weekday},
-    parser::{NaiveSessionIteratorExt, SessionIteratorClosingExt, SessionIteratorExt},
+    parser::{
+        NaiveSessionIteratorExt, SessionIteratorClosingExt, SessionIteratorExt, get_file_renew,
+    },
 };
 
 mod binnacle_2;
@@ -61,9 +64,27 @@ fn run(command: Command, cancel: Receiver<()>) -> Result<()> {
             );
 
             let file = file::require_clockin_file()?;
-            write_date(&file, false, '-')?;
-            edit_file(&file)?;
-            write_date(&file, true, '+')?;
+            let mut start_time = Local::now().fixed_offset();
+            loop {
+                write_date(&file, false, '-', start_time)?;
+                edit_file(&file)?;
+
+                let mut end_time = Local::now().fixed_offset();
+                let session_renew = get_file_renew(&file)?;
+                if let Some(session_renew) = session_renew {
+                    remove_last_content_line(&file)?;
+                    if let Some(renew_time) = session_renew {
+                        end_time = renew_time;
+                    }
+                }
+                write_date(&file, true, '+', end_time)?;
+
+                if session_renew.is_some() {
+                    start_time = end_time;
+                } else {
+                    break;
+                }
+            }
         }
         Command::WeekSummary => {
             let path = file::require_clockin_file()?;

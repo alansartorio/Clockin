@@ -1,10 +1,11 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader, Lines},
+    ops::Not,
     path::Path,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{
     DateTime, Duration, FixedOffset, Local, NaiveDateTime, NaiveTime, TimeDelta, TimeZone,
 };
@@ -43,6 +44,14 @@ fn extract_macro(line: &str, prefix: char) -> Option<DateTime<FixedOffset>> {
     is_macro_line(line, prefix)
         .then(|| &line[2..])
         .map(|d| DateTime::parse_from_rfc3339(d).unwrap())
+}
+
+fn extract_opt_macro(line: &str, prefix: char) -> Option<Option<DateTime<FixedOffset>>> {
+    is_macro_line(line, prefix).then(|| &line[2..]).map(|d| {
+        d.is_empty()
+            .not()
+            .then(|| DateTime::parse_from_rfc3339(d).unwrap())
+    })
 }
 
 pub struct MaybeFinishedSessionTZ<TZ: TimeZone> {
@@ -200,6 +209,18 @@ impl NaiveSession {
     pub fn duration(&self) -> TimeDelta {
         self.end - self.start
     }
+}
+
+pub fn get_file_renew(
+    path: impl AsRef<Path>,
+) -> Result<Option<Option<DateTime<FixedOffset>>>> {
+    Ok(
+        BufReader::new(File::open(path).with_context(|| "opening project file")?)
+            .lines()
+            .map(|l| l.unwrap())
+            .last()
+            .and_then(|last_line| extract_opt_macro(&last_line, '=')),
+    )
 }
 
 #[cfg(test)]

@@ -1,8 +1,9 @@
 use std::{
     env::current_dir,
-    fs::{self, File},
+    fs::{self, File, OpenOptions},
+    io::{Read, Seek, SeekFrom},
     os,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 
@@ -101,4 +102,34 @@ pub fn require_clockin_file() -> Result<PathBuf> {
 
 pub fn require_clockin_project_file() -> Result<PathBuf> {
     find_deepest_clockin_file().ok_or(anyhow!("clockin project file not found"))
+}
+
+pub fn remove_last_content_line(path: impl AsRef<Path>) -> std::io::Result<()> {
+    let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+    let file_len = file.metadata()?.len();
+    if file_len == 0 {
+        return Ok(());
+    }
+
+    let mut pos = file_len - 1;
+    let mut buffer = [0; 1];
+
+    file.seek(SeekFrom::Start(pos))?;
+    file.read_exact(&mut buffer)?;
+    if buffer == *b"\n" && pos > 0 {
+        pos -= 1;
+    }
+
+    while pos > 0 {
+        file.seek(SeekFrom::Start(pos))?;
+        file.read_exact(&mut buffer)?;
+        if buffer == *b"\n" {
+            file.set_len(pos + 1)?;
+            return Ok(());
+        }
+        pos -= 1;
+    }
+
+    file.set_len(0)?;
+    Ok(())
 }
